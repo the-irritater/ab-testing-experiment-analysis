@@ -290,7 +290,7 @@ add_code("""def check_randomization(control_df, experiment_df, metrics=['Pagevie
 balance = check_randomization(control_full, experiment_full)
 """)
 
-add_md("""**Interpretation:** Both invariant metrics (Pageviews and Clicks) show no statistically significant difference between the Control and Experiment groups:
+add_md("""**Interpretation:** Both invariant metrics (Pageviews and Clicks) show no significant imbalance detected between the Control and Experiment groups:
 - **Pageviews:** The sample ratio is close to 1.0, p-value well above 0.05, and Cohen's d is negligibly small. This confirms the traffic split is balanced.
 - **Clicks:** Similarly balanced, confirming that the randomization mechanism is working correctly and there is no Sample Ratio Mismatch (SRM).
 
@@ -617,9 +617,16 @@ print(f"\\n  95% CI (abs diff): [{enroll_results['ci_95'][0]*100:+.3f}%, {enroll
 print(f"  95% CI (relative): [{ci_rel_lower:+.2f}%, {ci_rel_upper:+.2f}%]")
 """)
 
-add_md("""### 8.3. Advanced Layer: Confidence Interval Visualization
+add_md("""**Interpretation:**
+- **Enrollment Result:** The enrollment rate plummeted from 21.9% to roughly 19.8%.
+  - **Absolute change** = −2.1 percentage points
+  - **Relative change** = −9.6%
+  
+  This is a large negative effect, not just statistically significant. Because the feature performed strictly worse, our right-tailed test yielded a p-value of ~1.000, meaning there is a near-zero probability of improvement.
 
-A critical part of statistical decision-making is visualizing the range of plausible effects. If the entire 95% Confidence Interval sits below zero, it proves the experiment is actively harmful.
+### 8.3. Advanced Layer: Confidence Interval Visualization
+
+A critical part of statistical decision-making is visualizing the range of plausible effects. If the entire confidence interval lies below zero, it proves the experiment is actively harmful.
 """)
 
 add_code("""# Visualize the Confidence Intervals for both metrics
@@ -654,7 +661,13 @@ Because our experimental group performed strictly worse than our control group, 
 
 > **Decision:** We fail to reject $H_0$ $\\rightarrow$ no significant improvement $\\rightarrow$ **do not launch.**
 
-Furthermore, the Confidence Interval Visualization explicitly confirms that the entire 95% CI is situated far below zero, demonstrating that the new feature actively damages enrollment rates.
+### Decision Framework
+- **Statistical significance** $\\rightarrow$ Yes
+- **Practical significance** $\\rightarrow$ High (−2.1 pp drop)
+- **Business impact** $\\rightarrow$ Negative ($1.2M loss)
+- **Risk** $\\rightarrow$ Low probability of hidden positive effect
+
+Furthermore, the Confidence Interval Visualization explicitly confirms that the entire confidence interval lies below zero, demonstrating that the new feature actively damages enrollment rates.
 
 | Metric | Direction | P-value | Conclusion |
 |:---|:---|:---|:---|
@@ -741,7 +754,7 @@ else:
 """)
 
 add_md("""**Interpretation:**
-- **Posterior Probability:** The probability that the Experiment outperforms the Control is essentially 0%, providing overwhelming Bayesian evidence that the feature *hurts* enrollment.
+- **Posterior Probability:** The probability that the Experiment outperforms the Control is a near-zero probability, providing overwhelming Bayesian evidence that the feature *hurts* enrollment.
 - **94% HDI:** The credible interval for the difference is entirely negative, meaning we can be highly confident the true effect is a reduction in enrollment.
 - **Expected Loss:** If we were to launch the feature despite this evidence, the expected conversion rate loss per user is quantified.
 
@@ -782,7 +795,7 @@ add_md("""**Interpretation:**
 - **Left Panel:** The posterior distributions of the two groups are clearly separated, with practically no overlap. The Experiment's enrollment rate distribution sits entirely to the left of the Control's, confirming a real and measurable decrease.
 - **Right Panel:** The entire posterior distribution of the difference (Experiment - Control) lies below zero. The red dashed line at zero (no effect) is nowhere near the distribution, making the evidence unambiguous.
 
-**Key Advantage of Bayesian Approach:** Unlike p-values, the posterior probability directly answers the business question: "How likely is it that this feature improves enrollment?" Answer: essentially 0%.
+**Key Advantage of Bayesian Approach:** Unlike p-values, the posterior probability directly answers the business question: "How likely is it that this feature improves enrollment?" Answer: near-zero probability.
 
 ---
 
@@ -1010,11 +1023,14 @@ This simulation provides a powerful argument for experimental discipline and pro
 
 To communicate findings to business stakeholders, we must translate statistical results into revenue terms.
 
-### Assumptions
-- 40,000 daily pageviews (split 50/50 between groups)
-- 3,200 daily clicks (baseline CTR = 8%)
-- 21.9% baseline enrollment rate
-- $50 average revenue per enrollment
+### Revenue Impact Calculation
+- **Daily users (clicks)** = 3,200
+- **Conversion drop** = 2.1 percentage points
+- **Revenue per conversion** = $50
+- **Annualization logic** = Daily Loss × 365 days
+
+**Formula:**
+`Revenue Loss = Traffic × Conversion Drop × Revenue per User × 365`
 """)
 
 add_code("""# Financial impact calculation
@@ -1081,12 +1097,17 @@ add_md("""**Interpretation:**
 
 4. **Future Experiments:** Adopt CUPED as a standard variance reduction technique to run shorter, more efficient experiments. Implement guardrails against peeking by pre-registering sample sizes and analysis dates.
 
-### Limitations & Future Work
+### Limitations
 
-1. **Synthetic Data:** This analysis uses simulated data. Real-world results may differ due to seasonal effects, user heterogeneity, and unmeasured confounders.
-2. **Network Effects:** The analysis assumes no spillover between treatment and control groups, which may not hold if users interact with each other.
-3. **Long-term Effects:** The 37-day window captures short-term behavior only. A longer experiment might reveal different patterns (e.g., novelty effects wearing off).
-4. **Subgroup Analysis:** Future work should examine whether the screener disproportionately impacts specific user segments (e.g., mobile vs. desktop, new vs. returning visitors).
+1. **Simulated dataset:** While metrics mimic realistic traffic, real-world data contains unmeasured confounders.
+2. **External validity:** The observed effect applies only to this specific user segment and course format.
+3. **Experiment duration assumptions:** A 37-day window may not capture long-term novelty effects wearing off.
+
+### What Next?
+
+1. **Segment analysis:** Investigate if the drop is isolated to specific device types (Mobile vs Desktop) or user types (New vs Returning).
+2. **Run a longer experiment:** To completely rule out novelty or Day-of-Week effects over multiple enrollment cycles.
+3. **Test alternative UI instead of full rollback:** Instead of a blocking popup, test presenting the screener as an optional sidebar widget.
 
 ### Statistical Rigor Applied
 

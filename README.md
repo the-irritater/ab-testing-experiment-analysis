@@ -1,5 +1,13 @@
 # The $1.2M Decision: A/B Testing & Causal Inference
 
+### Key Result (TL;DR):
+
+* **Enrollment dropped:** 21.9% → 19.8%
+* **Relative decline:** −9.6%
+* **Statistical significance:** Yes
+* **Estimated impact:** −$1.2M/year
+* **Decision:** Do not launch
+
 > **Disclaimer:** The dataset used in this project is **100% simulated**. It was generated programmatically to mimic realistic A/B test traffic on an online education platform. No real user data, company data, or production experiment results are used. This project is intended solely as a portfolio demonstration of statistical methodology.
 
 ## The Business Problem
@@ -17,7 +25,7 @@ This repository tracks the complete, end-to-end data decision-making flow that s
 ### 1. Validating the Test (Sanity Checks)
 Before looking at the final conversions, we must ensure the experiment was fair. If the underlying audience split is flawed, the entire test is invalid. We tested pre-treatment invariant metrics (Pageviews and Clicks).
 *   **Method:** Welch's t-test and Cohen's d effect size.
-*   **Outcome:** Groups were perfectly balanced ($p > 0.05$, $d \approx 0$). The traffic split was fair. We can proceed.
+*   **Outcome:** No significant imbalance detected ($p > 0.05$, $d \approx 0$). The traffic split was fair. We can proceed.
 
 ### 2. Guardrail Metric: The Click-Through Rate
 Did the new popup accidentally break the page or tank top-of-funnel clicks? 
@@ -30,12 +38,34 @@ Here is where the business value lies. Did the feature actually improve enrollme
 *   **Hypotheses:**
     *   $H_0: p_{new} \le p_{old}$ (The feature does NOT improve enrollment)
     *   $H_1: p_{new} > p_{old}$ (The feature DOES improve enrollment)
-*   **Outcome:** Enrollment conversion plummeted from 21.9% to 19.8% (a ~9% relative drop). Because it performed strictly worse, our right-tailed test yielded a p-value of essentially 1.000 ($p \gg 0.05$).
+*   **Outcome:** Enrollment conversion plummeted from 21.9% to 19.8%. 
+    *   **Absolute change** = −2.1 percentage points
+    *   **Relative change** = −9.6%
+
+    This is a large negative effect, not just statistically significant. Because it performed strictly worse, our right-tailed test yielded a near-zero probability of improvement ($p \gg 0.05$).
 
 ### 4. The Business Takeaway
+
+#### Decision Framework
+
+*   **Statistical significance** $\\rightarrow$ Yes
+*   **Practical significance** $\\rightarrow$ High (−2.1 pp drop)
+*   **Business impact** $\\rightarrow$ Negative ($1.2M loss)
+*   **Risk** $\\rightarrow$ Low probability of hidden positive effect
+
 > **We fail to reject $H_0$ $\\rightarrow$ no significant improvement $\\rightarrow$ do not launch.**
 
-Furthermore, translating this statistical drop into financial impact models showed that launching this feature to 100% of traffic would cost the business an estimated **~$1.2 million per year** in lost revenue.
+#### Revenue Impact Calculation
+
+*   **Daily users (clicks):** 3,200
+*   **Conversion drop:** 2.1 percentage points
+*   **Revenue per conversion:** $50
+*   **Annualization logic:** Daily loss × 365 days
+
+**Formula:**
+`Revenue Loss = Traffic × Conversion Drop × Revenue per User × 365`
+
+Furthermore, translating this statistical drop into our financial impact model showed that launching this feature to 100% of traffic would cost the business an estimated **~$1.2 million per year** in lost revenue.
 
 ---
 
@@ -43,10 +73,38 @@ Furthermore, translating this statistical drop into financial impact models show
 
 This project goes beyond a standard t-test by incorporating advanced data science methodology designed to protect a business from false conclusions:
 
-1. **Confidence Interval Visualization (Advanced Layer):** Rather than just reporting a p-value, this project explicitly visualizes the 95% Confidence Intervals for treatment effects. It proves visually that the entire range of plausible outcomes for the new feature sits firmly below zero, confirming active harm to the product.
-2. **CUPED Variance Reduction:** Demonstrates how to use pre-experiment covariate data (like historic clicks) to tighten confidence interval widths by roughly 30%, increasing statistical power without needing more traffic.
-3. **Bayesian Conjugate Modeling:** Uses Beta-Binomial conjugate distributions to definitively answer the business question, revealing there is a **~0% probability** the new feature is better than the control.
+1. **Confidence Interval Visualization (Advanced Layer):** Rather than just reporting a p-value, this project explicitly visualizes the 95% Confidence Intervals for treatment effects. It proves visually that the entire confidence interval lies below zero, confirming active harm to the product.
+2. **CUPED Variance Reduction:** Demonstrates how to use pre-experiment covariate data (like historic clicks) to tighten confidence interval widths by roughly 30%. 
+   *Snippet: `CI width reduced to 71.4% of original. Adjusted p-value: <0.0001`*
+3. **Bayesian Conjugate Modeling:** Uses Beta-Binomial conjugate distributions to definitively answer the business question, revealing there is a **near-zero probability** the new feature is better than the control.
+   *Snippet: `P(Experiment > Control): 0.00%. Expected Loss: 2.06%.`*
 4. **The Peeking Pitfall (Monte Carlo Simulation):** A custom simulation proving exactly why "optional stopping" (checking p-values early) is dangerous, showing how it inflates false positive rates by up to 7x.
+
+---
+
+### Visual Proof: Treatment Effect
+
+```text
+       Difference in Enrollment Rate (Experiment - Control)
+ 
+-3.0%       -2.5%       -2.0%       -1.5%       -1.0%         0% (No Effect)
+  |-----------|-----------|-----------|-----------|-----------|
+             [=============================]
+                      95% CI
+```
+**Interpretation:** The confidence interval (fully quantified in the notebook) sits completely below the zero line, providing unambiguous visual proof of the negative impact.
+
+### Limitations
+
+*   **Simulated dataset:** While metrics mimic realistic traffic, real-world data scaling often contains unmeasured confounders.
+*   **External validity:** The observed effect applies only to this specific user segment and course tier.
+*   **Experiment duration assumptions:** A 37-day window does not capture long-term learning or "novelty effects" wearing off completely.
+
+### What Next?
+
+*   **Segment analysis:** Investigate if the conversion drop is isolated to specific device types (Mobile vs Desktop) or user types (New vs Returning).
+*   **Run a longer experiment:** Continue gathering trial completion data to definitively rule out Day-of-Week cyclical effects.
+*   **Test alternative UI:** Instead of a blocking full-page popup, test presenting the screener as an optional sidebar widget.
 
 ---
 
