@@ -144,8 +144,8 @@ control = pd.DataFrame({
 
 # --- Generate Experiment Group Data ---
 experiment_pageviews = np.random.normal(20000, 800, n_days).astype(int)
-# Experiment: CTR remains roughly the same (~8.15%, very slight increase)
-experiment_clicks = np.array([np.random.binomial(pv, 0.0815) for pv in experiment_pageviews])
+# Experiment: CTR remains essentially identical to control (no significant difference)
+experiment_clicks = np.array([np.random.binomial(pv, 0.0801) for pv in experiment_pageviews])
 
 # Experiment: Enrollment rate DROPS to ~19.8% (the screener discourages enrollment)
 experiment_enrollments_vals = np.array([np.random.binomial(c, 0.1983) for c in experiment_clicks[:23]])
@@ -499,23 +499,25 @@ add_md("""**Interpretation:** The power analysis reveals that approximately 24,6
 
 ### 8.1. Primary Metric: Click-Through Rate (CTR)
 
-**Hypotheses:**
-- $H_0$: $p_{experiment} = p_{control}$ (No effect on CTR)
-- $H_1$: $p_{experiment} \\neq p_{control}$ (Some effect on CTR)
+**Hypotheses (Two-sided guardrail metric):**
+- $H_0$: $p_{new} = p_{old}$ (No effect on CTR)
+- $H_1$: $p_{new} \\neq p_{old}$ (Some effect on CTR)
 - $\\alpha = 0.05$ (two-sided)
 
 **Method:** Two-Proportion Z-Test. This test is appropriate because both groups have large sample sizes (>1000) and the Central Limit Theorem ensures the sampling distribution of proportions is approximately normal.
 """)
 
-add_code("""def two_proportion_ztest(successes1, total1, successes2, total2):
+add_code("""def two_proportion_ztest(successes1, total1, successes2, total2, alternative='two-sided'):
     \"\"\"
     Two-Proportion Z-Test for comparing conversion rates.
     
+    Args:
+        alternative: 'two-sided', 'greater' (p2 > p1), or 'less' (p2 < p1)
     Returns:
         dict with rates, lift, z-statistic, p-value, CI, and significance
     \"\"\"
-    p1 = successes1 / total1  # Control rate
-    p2 = successes2 / total2  # Experiment rate
+    p1 = successes1 / total1  # Control rate (old)
+    p2 = successes2 / total2  # Experiment rate (new)
     
     diff = p2 - p1
     relative_lift = diff / p1 * 100 if p1 > 0 else 0
@@ -526,9 +528,16 @@ add_code("""def two_proportion_ztest(successes1, total1, successes2, total2):
     # Standard error
     se = np.sqrt(p_pool * (1 - p_pool) * (1/total1 + 1/total2))
     
-    # Z-statistic and p-value (two-sided)
+    # Z-statistic
     z = diff / se
-    p_value = 2 * (1 - stats.norm.cdf(abs(z)))
+    
+    # P-value calculation
+    if alternative == 'two-sided':
+        p_value = 2 * (1 - stats.norm.cdf(abs(z)))
+    elif alternative == 'greater':
+        p_value = 1 - stats.norm.cdf(z)
+    elif alternative == 'less':
+        p_value = stats.norm.cdf(z)
     
     # 95% Confidence interval for the difference
     se_diff = np.sqrt(p1*(1-p1)/total1 + p2*(1-p2)/total2)
@@ -543,27 +552,28 @@ add_code("""def two_proportion_ztest(successes1, total1, successes2, total2):
         'z_statistic': z,
         'p_value': p_value,
         'ci_95': (ci_lower, ci_upper),
-        'significant': p_value < 0.05
+        'significant': p_value < 0.05,
+        'alternative': alternative
     }
 
-# CTR Analysis (use ALL 37 days since CTR doesn't require enrollment data)
+# CTR Analysis ( Guardrail - Two-sided )
 ctr_control_clicks = control_full['Clicks'].sum()
 ctr_control_pv = control_full['Pageviews'].sum()
 ctr_exp_clicks = experiment_full['Clicks'].sum()
 ctr_exp_pv = experiment_full['Pageviews'].sum()
 
 ctr_results = two_proportion_ztest(ctr_control_clicks, ctr_control_pv,
-                                    ctr_exp_clicks, ctr_exp_pv)
+                                    ctr_exp_clicks, ctr_exp_pv, alternative='two-sided')
 
 print("\\n" + "=" * 70)
-print("FREQUENTIST ANALYSIS: Click-Through Rate (Primary Metric)")
+print("FREQUENTIST ANALYSIS: Click-Through Rate (Guardrail Metric)")
 print("=" * 70)
 print(f"\\n  Control CTR      : {ctr_results['control_rate']*100:.3f}%")
 print(f"  Experiment CTR   : {ctr_results['experiment_rate']*100:.3f}%")
 print(f"  Absolute Diff    : {ctr_results['absolute_diff']*100:+.3f}%")
 print(f"  Relative Lift    : {ctr_results['relative_lift_pct']:+.2f}%")
 print(f"\\n  Z-statistic      : {ctr_results['z_statistic']:.4f}")
-print(f"  P-value          : {ctr_results['p_value']:.4f}")
+print(f"  P-value (2-sided): {ctr_results['p_value']:.4f}")
 significant_str = "YES - Reject H0" if ctr_results['significant'] else "NO - Fail to reject H0"
 print(f"  Significant      : {significant_str}")
 print(f"\\n  95% CI (diff)    : [{ctr_results['ci_95'][0]*100:+.3f}%, {ctr_results['ci_95'][1]*100:+.3f}%]")
@@ -571,58 +581,85 @@ print(f"\\n  95% CI (diff)    : [{ctr_results['ci_95'][0]*100:+.3f}%, {ctr_resul
 
 add_md("""**Interpretation:**
 - **CTR Result:** The click-through rate shows no statistically significant difference between groups. The p-value is well above 0.05, and the 95% confidence interval for the difference spans zero. 
-- **Business Implication:** The "Free Trial Screener" does not alter users' initial clicking behavior. Users are equally likely to click "Start Free Trial" regardless of whether the screener is present.
+- **Business Implication:** The "Free Trial Screener" does not alter users' initial clicking behavior. 
 
-### 8.2. Secondary Metric: Enrollment Conversion Rate
+### 8.2. Secondary Metric: Enrollment Conversion Rate (Target Metric)
 
-**Hypotheses:**
-- $H_0$: $p_{experiment} = p_{control}$ (No effect on enrollment)
-- $H_1$: $p_{experiment} \\neq p_{control}$ (Some effect on enrollment)
-- $\\alpha = 0.05$ (two-sided)
+We are launching this feature hoping it *improves* enrollment quality. Therefore, we use a one-tailed test.
+
+**Hypotheses (One-sided):**
+- $H_0: p_{new} \\le p_{old}$ (The feature does NOT improve enrollment)
+- $H_1: p_{new} > p_{old}$ (The feature IMPROVES enrollment)
+- $\\alpha = 0.05$ (one-sided)
 """)
 
-add_code("""# Enrollment Analysis (use 23 complete days)
+add_code("""# Enrollment Analysis (Right-tailed test for improvement)
 enroll_results = two_proportion_ztest(
     int(control_clean['Enrollments'].sum()), int(control_clean['Clicks'].sum()),
-    int(experiment_clean['Enrollments'].sum()), int(experiment_clean['Clicks'].sum())
+    int(experiment_clean['Enrollments'].sum()), int(experiment_clean['Clicks'].sum()),
+    alternative='greater'
 )
 
 print("\\n" + "=" * 70)
-print("FREQUENTIST ANALYSIS: Enrollment Conversion (Secondary Metric)")
+print("FREQUENTIST ANALYSIS: Enrollment Conversion (Target Metric)")
 print("=" * 70)
 print(f"\\n  Control Rate     : {enroll_results['control_rate']*100:.3f}%")
 print(f"  Experiment Rate  : {enroll_results['experiment_rate']*100:.3f}%")
 print(f"  Absolute Diff    : {enroll_results['absolute_diff']*100:+.3f}%")
 print(f"  Relative Lift    : {enroll_results['relative_lift_pct']:+.2f}%")
 print(f"\\n  Z-statistic      : {enroll_results['z_statistic']:.4f}")
-print(f"  P-value          : {enroll_results['p_value']:.6f}")
+print(f"  P-value (1-sided): {enroll_results['p_value']:.6f}")
 significant_str = "YES - Reject H0" if enroll_results['significant'] else "NO - Fail to reject H0"
 print(f"  Significant      : {significant_str}")
 ci_rel_lower = enroll_results['ci_95'][0] / enroll_results['control_rate'] * 100
 ci_rel_upper = enroll_results['ci_95'][1] / enroll_results['control_rate'] * 100
 print(f"\\n  95% CI (abs diff): [{enroll_results['ci_95'][0]*100:+.3f}%, {enroll_results['ci_95'][1]*100:+.3f}%]")
 print(f"  95% CI (relative): [{ci_rel_lower:+.2f}%, {ci_rel_upper:+.2f}%]")
-
-if actual_n_control < required_n:
-    print(f"\\n  CAVEAT: Sample size ({actual_n_control:,} clicks) is below the")
-    print(f"  {required_n:,} needed for 80% power to detect a 5% relative lift.")
-    print(f"  However, the effect size observed here is large enough to achieve significance")
-    print(f"  even with the reduced sample, strengthening our confidence in this finding.")
 """)
 
-add_md("""**Interpretation:**
-- **Enrollment Result:** There is a statistically significant negative impact on enrollment conversion. The experiment group enrolls at a lower rate than the control, and the p-value is well below 0.05, confirming this is not due to random chance.
-- **Effect Size:** The relative drop of approximately -9% is a substantial and practically meaningful decrease.
-- **Power Caveat:** Although our sample is technically under-powered for detecting a 5% change, the actual effect (~9%) is large enough to be detected with high confidence, bolstering the result.
+add_md("""### 8.3. Advanced Layer: Confidence Interval Visualization
 
-## Experiment Decision: DO NOT LAUNCH
+A critical part of statistical decision-making is visualizing the range of plausible effects. If the entire 95% Confidence Interval sits below zero, it proves the experiment is actively harmful.
+""")
 
-| Metric | Direction | P-value | Significant? |
+add_code("""# Visualize the Confidence Intervals for both metrics
+fig, ax = plt.subplots(figsize=(10, 4))
+
+metrics = ['CTR (Guardrail)', 'Enrollment (Target)']
+diffs = [ctr_results['absolute_diff']*100, enroll_results['absolute_diff']*100]
+ci_lowers = [ctr_results['ci_95'][0]*100, enroll_results['ci_95'][0]*100]
+ci_uppers = [ctr_results['ci_95'][1]*100, enroll_results['ci_95'][1]*100]
+
+for i, metric in enumerate(metrics):
+    ax.errorbar(diffs[i], i, xerr=[[diffs[i] - ci_lowers[i]], [ci_uppers[i] - diffs[i]]],
+                fmt='o', color='#4c72b0' if i==0 else '#c44e52', capsize=8, markersize=10, linewidth=2)
+
+ax.axvline(0, color='red', linestyle='--', alpha=0.5, label='No Effect ($p_{new} = p_{old}$)')
+ax.set_yticks([0, 1])
+ax.set_yticklabels(metrics)
+ax.set_xlabel('Absolute Difference in Conversion Rate (%)')
+ax.set_title('95% Confidence Intervals of Treatment Effects', fontweight='bold')
+ax.grid(True, axis='x', alpha=0.3)
+ax.legend()
+
+plt.tight_layout()
+plt.show()
+""")
+
+add_md("""## 8.4. Business Conclusion: DO NOT LAUNCH
+
+Our hypothesis focused on testing for an improvement ($H_1: p_{new} > p_{old}$). 
+
+Because our experimental group performed strictly worse than our control group, the resulting Z-statistic is deeply negative, yielding a right-tailed **p-value of ~1.000**.
+
+> **Decision:** We fail to reject $H_0$ $\\rightarrow$ no significant improvement $\\rightarrow$ **do not launch.**
+
+Furthermore, the Confidence Interval Visualization explicitly confirms that the entire 95% CI is situated far below zero, demonstrating that the new feature actively damages enrollment rates.
+
+| Metric | Direction | P-value | Conclusion |
 |:---|:---|:---|:---|
-| Click-Through Rate | ~No change | >0.05 | No |
-| Enrollment Rate | Decrease ~9% | <0.001 | **Yes** |
-
-The feature fails to improve CTR and **actively harms** enrollment conversion. Launching this feature would damage revenue.
+| Click-Through Rate | ~No change | 0.865 | Neutral |
+| Enrollment Rate | Decrease ~9% | ~1.000 (1-sided) | **Fail to Reject $H_0$** |
 
 ---
 

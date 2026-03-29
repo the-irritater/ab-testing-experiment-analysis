@@ -1,157 +1,94 @@
-# Web Feature A/B Testing: Causal Inference and Statistical Decision-Making
+# The $1.2M Decision: A/B Testing & Causal Inference
 
-> **Disclaimer:** The dataset used in this project is 100% simulated. It was generated programmatically to mimic realistic A/B test traffic on an online education platform. No real user data, company data, or production experiment results are used. This project is intended solely as a portfolio demonstration of statistical methodology.
+> **Disclaimer:** The dataset used in this project is **100% simulated**. It was generated programmatically to mimic realistic A/B test traffic on an online education platform. No real user data, company data, or production experiment results are used. This project is intended solely as a portfolio demonstration of statistical methodology.
 
-## At a Glance
+## The Business Problem
 
-This project analyzes an A/B test for a "Free Trial Screener" feature on an online education platform. The goal is to determine whether the feature improves conversion quality or creates unnecessary friction in the enrollment funnel.
+An online education platform was eager to launch a "Free Trial Screener" on its course overview page. The idea sounded perfectly logical: by asking users about their weekly time commitment *before* they clicked "Start Free Trial", the platform could filter out low-intent users early. 
 
-Using simulated experiment data, the analysis applies both Frequentist and Bayesian methods, validates randomization, checks statistical power, demonstrates CUPED variance reduction, and translates the result into business impact.
+The product team hypothesized this friction would increase the *quality* of free trial sign-ups, thereby boosting overall enrollment rates. But intuition is not always reality, and in the EdTech industry, a 1% change in enrollment conversion can translate to millions of dollars. To find out if this feature was actually helping, we ran a 37-day A/B test.
 
-**Final recommendation: DO NOT LAUNCH.**
+This repository tracks the complete, end-to-end data decision-making flow that saved the company from a costly mistake.
 
-- CTR shows no meaningful improvement.
-- Enrollment rate drops by about 9%.
-- Estimated annual revenue impact is approximately **$1.2M in losses**.
+---
 
-## Short Problem Statement
+## The Decision-Making Flow
 
-An online education platform introduced a pre-enrollment screening step before users could start a free trial. The product team believed this would improve enrollment quality by filtering out low-intent users. This project tests whether that assumption is statistically and commercially valid.
+### 1. Validating the Test (Sanity Checks)
+Before looking at the final conversions, we must ensure the experiment was fair. If the underlying audience split is flawed, the entire test is invalid. We tested pre-treatment invariant metrics (Pageviews and Clicks).
+*   **Method:** Welch's t-test and Cohen's d effect size.
+*   **Outcome:** Groups were perfectly balanced ($p > 0.05$, $d \approx 0$). The traffic split was fair. We can proceed.
 
-## Why This Project Matters
+### 2. Guardrail Metric: The Click-Through Rate
+Did the new popup accidentally break the page or tank top-of-funnel clicks? 
+*   **Method:** Two-Proportion Z-Test (Two-sided).
+*   **Outcome:** No significant difference observed ($p = 0.865$). Users clicked the "Start Free Trial" button at the same 8% rate regardless of the screener. 
 
-Recruiters and hiring managers usually want to see more than charts and p-values. They want to know whether you can connect data analysis to product decisions. This project demonstrates:
+### 3. Target Metric: The Enrollment Rate (The Moment of Truth)
+Here is where the business value lies. Did the feature actually improve enrollment? We ran a formal, one-sided statistical test to check for improvement.
 
-- Clear experiment framing tied to a business question
-- Strong statistical reasoning, not just dashboarding
-- Ability to validate assumptions before interpreting results
-- Communication of findings in product and revenue terms
-- End-to-end reproducibility through code and notebook automation
+*   **Hypotheses:**
+    *   $H_0: p_{new} \le p_{old}$ (The feature does NOT improve enrollment)
+    *   $H_1: p_{new} > p_{old}$ (The feature DOES improve enrollment)
+*   **Outcome:** Enrollment conversion plummeted from 21.9% to 19.8% (a ~9% relative drop). Because it performed strictly worse, our right-tailed test yielded a p-value of essentially 1.000 ($p \gg 0.05$).
 
-## Business Takeaway
+### 4. The Business Takeaway
+> **We fail to reject $H_0$ $\\rightarrow$ no significant improvement $\\rightarrow$ do not launch.**
 
-An online education platform tested a "Free Trial Screener" feature designed to improve enrollment quality. This analysis applies six complementary statistical techniques to the A/B test data and reaches a clear verdict:
+Furthermore, translating this statistical drop into financial impact models showed that launching this feature to 100% of traffic would cost the business an estimated **~$1.2 million per year** in lost revenue.
 
-- The feature does not improve Click-Through Rate (CTR).
-- It significantly reduces enrollment rate by approximately 9%.
-- Launching it would cost an estimated **~$1.2 million per year** in lost revenue.
+---
 
-This project demonstrates how rigorous experimentation methodology, including power analysis, Frequentist and Bayesian testing, variance reduction, and pitfall awareness, protects businesses from costly mistakes.
+## 🚀 Advanced Statistical Layers
 
-## What a Recruiter Can Infer From This Project
+This project goes beyond a standard t-test by incorporating advanced data science methodology designed to protect a business from false conclusions:
 
-- I can design and evaluate experiments, not just report metrics.
-- I understand statistical significance, practical significance, and business significance.
-- I know how to check randomization, power, and common A/B testing pitfalls.
-- I can present technical work in a structured, decision-oriented way.
-- I can package analysis into a reproducible project suitable for collaboration or review.
+1. **Confidence Interval Visualization (Advanced Layer):** Rather than just reporting a p-value, this project explicitly visualizes the 95% Confidence Intervals for treatment effects. It proves visually that the entire range of plausible outcomes for the new feature sits firmly below zero, confirming active harm to the product.
+2. **CUPED Variance Reduction:** Demonstrates how to use pre-experiment covariate data (like historic clicks) to tighten confidence interval widths by roughly 30%, increasing statistical power without needing more traffic.
+3. **Bayesian Conjugate Modeling:** Uses Beta-Binomial conjugate distributions to definitively answer the business question, revealing there is a **~0% probability** the new feature is better than the control.
+4. **The Peeking Pitfall (Monte Carlo Simulation):** A custom simulation proving exactly why "optional stopping" (checking p-values early) is dangerous, showing how it inflates false positive rates by up to 7x.
 
-## Overview
-
-This project implements an end-to-end A/B testing framework covering the full experimentation lifecycle. The Jupyter notebook walks through each step with detailed explanations, code, visualizations, and interpretations.
-
-| Field | Details |
-|:---|:---|
-| **Project** | A/B Test Experiment Analysis with Causal Inference |
-| **Dataset** | Simulated online course platform traffic (synthetic, not real) |
-| **Author** | Sanman |
-| **Date** | March 2026 |
-| **Tools** | Python, NumPy, Pandas, SciPy, Matplotlib, Seaborn |
-
-## Key Questions Answered
-
-1. Was the A/B test properly randomized?
-2. Was the sample size large enough to detect a meaningful effect?
-3. Did the feature improve CTR?
-4. Did the feature improve enrollment conversion?
-5. What is the Bayesian probability that the experiment is actually better?
-6. What would be the financial impact of launching the feature?
+---
 
 ## What's Inside the Notebook
 
 | Section | Topic | Key Output |
 |:---|:---|:---|
-| 1-2 | Problem statement and objectives | Six clearly defined analytical goals |
-| 3 | Dataset overview and synthetic generation | 37-day simulated A/B test with about 20K pageviews/day/group |
-| 4 | Data preprocessing | Missing data analysis and analysis-ready filtering |
-| 5 | Randomization check | Welch's t-test and Cohen's d confirm group balance |
-| 6 | Exploratory data analysis | Boxplots, daily trends, and funnel comparison |
-| 7 | Power analysis | Required sample size calculation: 24,643 clicks/group |
-| 8 | Frequentist hypothesis testing | Two-proportion z-tests for CTR and enrollment |
-| 9 | Bayesian A/B testing | Beta-Binomial posterior estimation and visualization |
-| 10 | CUPED variance reduction | Confidence interval width reduced to about 71% of original |
-| 11 | Peeking simulation | Monte Carlo demonstration of false positive inflation |
-| 12 | Financial impact assessment | About $1.2M projected annual revenue loss |
-| 13 | Conclusion and recommendations | Final decision, root-cause hypotheses, next steps |
+| §1–3 | Problem & Data Generation | 37-day simulated A/B test, ~20K pageviews/day/group |
+| §4–6 | Preprocessing & EDA | Missing data analysis, funnel viz, randomization checks |
+| §7 | Power Analysis | Required sample size calculation (24,643 clicks/group) |
+| §8 | Frequentist Testing | 1-Sided Z-Tests, P-Values, and CI Visualization |
+| §9 | Bayesian A/B Testing | Beta-Binomial conjugate model, posterior visualization |
+| §10 | CUPED Variance Reduction | CI width reduced to ~71% of original |
+| §11 | Peeking Simulation | Monte Carlo showing false positive inflation |
+| §12 | Financial Impact Assessment | ~$1.2M projected annualized revenue loss |
 
-## Statistical Methods Used
+---
 
-| Method | Purpose | Key Result |
-|:---|:---|:---|
-| Power analysis | Determine required sample size | 24,643 clicks/group for 80% power |
-| Welch's t-test and Cohen's d | Validate randomization balance | Groups balanced, p > 0.05 and \|d\| < 0.2 |
-| Two-proportion z-test (CTR) | Test click-through rate difference | Not significant |
-| Two-proportion z-test (Enrollment) | Test enrollment rate difference | Significant negative effect, p < 0.001 |
-| Bayesian Beta-Binomial | Estimate posterior probability of improvement | Approximately 0% chance experiment is better |
-| CUPED | Tighten confidence intervals | CI width reduced to about 71% of original |
-| Monte Carlo peeking simulation | Quantify false positive inflation | About 7x inflation from frequent peeking |
-
-## How to Run
+## How to Run This Analysis
 
 ```bash
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Generate the notebook and execute it with outputs
+# 2. Generate the notebook AND execute it with all outputs
 python run_and_save.py
 
-# 3. Open the notebook
+# 3. Open in Jupyter (or view directly on GitHub)
 jupyter notebook AB_Testing_Experiment_Analysis.ipynb
 ```
 
 **Alternative (manual):**
-
 ```bash
 python create_notebook.py
 jupyter nbconvert --to notebook --execute --inplace AB_Testing_Experiment_Analysis.ipynb
 ```
 
-## Project Structure
+## Tools & Libraries
+- **Python 3.8+**
+- **NumPy ≥ 1.24**
+- **Pandas ≥ 2.0**
+- **Matplotlib & Seaborn**
+- **SciPy ≥ 1.10**
 
-```text
-ab-testing-experiment-analysis/
-|-- AB_Testing_Experiment_Analysis.ipynb   # Generated and executed notebook
-|-- create_notebook.py                     # Builds the notebook programmatically
-|-- run_and_save.py                        # Generate -> execute -> save
-|-- requirements.txt                       # Python dependencies
-|-- README.md                              # Project documentation
-`-- .gitignore                             # Git ignore rules
-```
-
-## Dependencies
-
-- Python 3.8+
-- NumPy >= 1.24
-- Pandas >= 2.0
-- Matplotlib >= 3.7
-- Seaborn >= 0.12
-- SciPy >= 1.10
-- Jupyter >= 1.0
-
-No heavy dependencies like PyMC or TensorFlow are required. The Bayesian analysis uses SciPy's Beta distribution directly.
-
-## Portfolio Value
-
-This project is especially relevant for roles involving:
-
-- Data Analyst
-- Product Analyst
-- Experimentation Analyst
-- Business Analyst
-- Junior Data Scientist
-
-It highlights practical experimentation skills that are useful in product, growth, edtech, and conversion optimization contexts.
-
-## License
-
-This project is for educational and portfolio purposes.
+*(No heavy dependencies like PyMC; the Bayesian engine relies on native SciPy conjugate distributions for high-speed computation.)*
